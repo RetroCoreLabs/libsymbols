@@ -108,10 +108,21 @@ typedef struct {
     int variable_capacity;
 } symbol_function_t;
 
+/* A variable at a fixed address, outside every routine: a data-element of a PLANC module
+ * (GLOBAL:NAME:TYPE -> ADDRESS in the .srcmap; aout2brf -S of nd-lang writes it). */
+typedef struct {
+    char *name;              /* Variable name, as in the source */
+    char *type_name;         /* What the compiler knows of it ("word", "byte", "word(0:300)") */
+    uint16_t address;        /* Its address */
+} symbol_global_t;
+
 typedef struct {
     symbol_function_t *functions;
     int function_count;
     int function_capacity;
+    symbol_global_t *globals;
+    int global_count;
+    int global_capacity;
 } symbol_debug_info_t;
 
 // Create/free debug info

@@ -36,6 +36,11 @@ symbols_debug_info_free(symbol_debug_info_t *info)
         free(fn->variables);
     }
     free(info->functions);
+    for (i = 0; i < info->global_count; i++) {
+        free(info->globals[i].name);
+        free(info->globals[i].type_name);
+    }
+    free(info->globals);
     free(info);
 }
 
@@ -204,6 +209,43 @@ symbols_load_srcmap_debug(symbol_debug_info_t *info, const char *filename)
         }
 
         /*
+         * GLOBAL:name:type -> address   (a variable at a fixed address, octal)
+         * The type may hold a colon itself ("word(0:300)"), so the name ends at the first
+         * colon and the type runs to the arrow.
+         */
+        if (strncmp(p, "GLOBAL:", 7) == 0) {
+            char *rest = p + 7;
+            char *c1 = strchr(rest, ':');
+            if (!c1) continue;
+            char *arrow = strstr(c1 + 1, "->");
+            if (!arrow) continue;
+            *c1 = '\0';
+            *arrow = '\0';
+            char *varname = trim(rest);
+            char *typename_str = trim(c1 + 1);
+            uint16_t addr = (uint16_t)strtoul(trim(arrow + 2), NULL, 8);
+
+            if (info->global_count >= info->global_capacity) {
+                int newcap = info->global_capacity ? info->global_capacity * 2 : 8;
+                symbol_global_t *ng = realloc(info->globals, newcap * sizeof(*ng));
+                if (!ng) continue;
+                info->globals = ng;
+                info->global_capacity = newcap;
+            }
+            symbol_global_t *g = &info->globals[info->global_count];
+            g->name = strdup(varname);
+            g->type_name = strdup(typename_str);
+            g->address = addr;
+            if (!g->name || !g->type_name) {
+                free(g->name);
+                free(g->type_name);
+                continue;
+            }
+            info->global_count++;
+            continue;
+        }
+
+        /*
          * LBRAC:funcname -> address  (scope begin - unused for now)
          */
         if (strncmp(p, "LBRAC:", 6) == 0) {
@@ -252,7 +294,7 @@ symbols_load_srcmap_debug(symbol_debug_info_t *info, const char *filename)
         /* else keep the existing end_address (RBRAC or 0xFFFF sentinel) */
     }
 
-    return info->function_count > 0;
+    return info->function_count > 0 || info->global_count > 0;
 }
 
 symbol_function_t *
