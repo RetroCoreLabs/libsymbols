@@ -116,6 +116,20 @@ typedef struct {
     uint16_t address;        /* Its address */
 } symbol_global_t;
 
+/* The most words a CODE line holds (AOUT16_CODE_WORDS in nd-lang's aout2brf.h) */
+#define SYMBOL_CODE_WORDS 4
+
+/* The first words of the program's code at a source line's address, as they are loaded
+ * (CODE:ADDRESS -> W1 W2 ... in the .srcmap, octal; aout2brf -S of nd-lang writes it). A
+ * debugger compares them with memory when a breakpoint there stops: other programs can run at
+ * the same virtual address on the same level with the same page tables (SINTRAN does that),
+ * and a stop counts only when the words are this program's. */
+typedef struct {
+    uint16_t address;                  /* The source line's address */
+    int count;                         /* Words in words[], 1 to SYMBOL_CODE_WORDS */
+    uint16_t words[SYMBOL_CODE_WORDS]; /* The words from that address on */
+} symbol_code_t;
+
 typedef struct {
     symbol_function_t *functions;
     int function_count;
@@ -123,7 +137,13 @@ typedef struct {
     symbol_global_t *globals;
     int global_count;
     int global_capacity;
+    symbol_code_t *codes;
+    int code_count;
+    int code_capacity;
 } symbol_debug_info_t;
+
+/* The CODE entry at this address, or NULL when the map has none there. */
+const symbol_code_t *symbols_find_code(const symbol_debug_info_t *info, uint16_t address);
 
 // Create/free debug info
 symbol_debug_info_t *symbols_debug_info_create(void);

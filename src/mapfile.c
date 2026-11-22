@@ -44,8 +44,11 @@ bool mapfile_parse_file(const char* filename, map_entry_t** entries, size_t* cou
         char* trimmed = trim_whitespace(line);
         if (*trimmed == '\0' || *trimmed == '#') continue;
 
-        // Skip extended srcmap entries (FUNC, PARAM, LOCAL, LBRAC, RBRAC)
-        if (strncmp(trimmed, "FUNC:", 5) == 0 ||
+        // Skip extended srcmap entries (FUNC, PARAM, LOCAL, LBRAC, RBRAC, GLOBAL, CODE): read
+        // as "file:line", a GLOBAL or CODE line made a source file of that name
+        if (strncmp(trimmed, "GLOBAL:", 7) == 0 ||
+            strncmp(trimmed, "CODE:", 5) == 0 ||
+            strncmp(trimmed, "FUNC:", 5) == 0 ||
             strncmp(trimmed, "PARAM:", 6) == 0 ||
             strncmp(trimmed, "LOCAL:", 6) == 0 ||
             strncmp(trimmed, "LBRAC:", 6) == 0 ||

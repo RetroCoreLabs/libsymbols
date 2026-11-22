@@ -41,7 +41,22 @@ symbols_debug_info_free(symbol_debug_info_t *info)
         free(info->globals[i].type_name);
     }
     free(info->globals);
+    free(info->codes);
     free(info);
+}
+
+const symbol_code_t *
+symbols_find_code(const symbol_debug_info_t *info, uint16_t address)
+{
+    int i;
+
+    if (!info)
+        return NULL;
+    for (i = 0; i < info->code_count; i++) {
+        if (info->codes[i].address == address)
+            return &info->codes[i];
+    }
+    return NULL;
 }
 
 /*
@@ -242,6 +257,36 @@ symbols_load_srcmap_debug(symbol_debug_info_t *info, const char *filename)
                 continue;
             }
             info->global_count++;
+            continue;
+        }
+
+        /*
+         * CODE:address -> w1 w2 ...   (the words of the code at a source line's address, octal)
+         */
+        if (strncmp(p, "CODE:", 5) == 0) {
+            char *arrow = strstr(p + 5, "->");
+            if (!arrow) continue;
+            *arrow = '\0';
+            symbol_code_t c;
+            char *q = arrow + 2;
+            char *end;
+            memset(&c, 0, sizeof c);
+            c.address = (uint16_t)strtoul(trim(p + 5), NULL, 8);
+            while (c.count < SYMBOL_CODE_WORDS) {
+                unsigned long w = strtoul(q, &end, 8);
+                if (end == q) break;
+                c.words[c.count++] = (uint16_t)w;
+                q = end;
+            }
+            if (c.count == 0) continue;
+            if (info->code_count >= info->code_capacity) {
+                int newcap = info->code_capacity ? info->code_capacity * 2 : 16;
+                symbol_code_t *nc = realloc(info->codes, newcap * sizeof(*nc));
+                if (!nc) continue;
+                info->codes = nc;
+                info->code_capacity = newcap;
+            }
+            info->codes[info->code_count++] = c;
             continue;
         }
 
